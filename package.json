@@ -1,9 +1,11 @@
 {
   "name": "bhtsne",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "NodeJS wrapper for bhtsne",
   "main": "bhtsne.js",
-  "dependencies": {},
+  "dependencies": {
+    "tmp": "0.0.31"
+  },
   "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
