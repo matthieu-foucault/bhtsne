@@ -1,0 +1,23 @@
+{
+  "name": "bhtsne",
+  "version": "1.0.0",
+  "description": "NodeJS wrapper for bhtsne",
+  "main": "bhtsne.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matthieu-foucault/bhtsne.git"
+  },
+  "author": "Matthieu Foucault",
+  "license": "MIT",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/matthieu-foucault/bhtsne/issues"
+  },
+  "homepage": "https://github.com/matthieu-foucault/bhtsne#readme"
+}
