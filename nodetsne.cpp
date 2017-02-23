@@ -1,7 +1,6 @@
 #include <node.h>
 #include "tsne.h"
 #include <stdlib.h>
-#include <malloc.h>
 
 using v8::FunctionCallbackInfo;
 using v8::Isolate;
