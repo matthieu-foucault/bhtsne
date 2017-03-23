@@ -6,7 +6,10 @@ module.exports = function(data, userOpts, callback) {
 		const bp = cp.fork(`${__dirname}/bhtsneProcess.js`, [], {cwd:path})
 		bp.send({data, userOpts})
 
-		bp.on('message', (result) => {callback(null, result)})
+		bp.on('message', (result) => {
+			bp.kill()
+			callback(null, result)
+		})
 
 	})
 }

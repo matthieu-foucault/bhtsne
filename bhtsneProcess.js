@@ -41,6 +41,7 @@ process.on('message', ({data, userOpts}) => {
 	ws.end()
 	ws.on('finish', () => {
 		bhtsne.run()
+		console.log('bhtsne is done')
 		fs.open('./result.dat', 'r', (err, fd) => {
 			if (err) return callback(err)
 			// The first two integers are just the number of samples and the dimensionality, no need to read those
@@ -62,7 +63,6 @@ process.on('message', ({data, userOpts}) => {
 				const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
 
 				process.send(result)
-				process.kill(process.pid)
 			})
 		})
 	})
