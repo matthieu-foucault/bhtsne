@@ -12,7 +12,6 @@ using v8::Value;
 void Method(const FunctionCallbackInfo<Value>& args) {
 	// Define some variables
 	int origN, N, D, no_dims, max_iter, *landmarks;
-	double perc_landmarks;
 	double perplexity, theta, *data;
     int rand_seed = -1;
     TSNE* tsne = new TSNE();
@@ -30,10 +29,10 @@ void Method(const FunctionCallbackInfo<Value>& args) {
 		double* Y = (double*) malloc(N * no_dims * sizeof(double));
 		double* costs = (double*) calloc(N, sizeof(double));
         if(Y == NULL || costs == NULL) { printf("Memory allocation failed!\n"); exit(1); }
-		tsne->run(data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, max_iter);
+		tsne->run(data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, landmarks, costs, max_iter);
 
 		// Save the results
-		tsne->save_data(Y, landmarks, costs, N, no_dims);
+		// tsne->save_data(Y, landmarks, costs, N, no_dims, max_iter);
 
         // Clean up the memory
 		free(data); data = NULL;
