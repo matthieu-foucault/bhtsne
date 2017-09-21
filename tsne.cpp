@@ -700,7 +700,6 @@
  
      // Open file, write first 2 integers and then the data
      std::string pathString = "result" + std::to_string(iter) + ".dat";
-     std::cout << pathString + "\n";
      FILE *h;
      if((h = fopen(pathString.c_str(), "w+b")) == NULL) {
          printf("Error: could not open data file.\n");
@@ -712,7 +711,7 @@
      fwrite(landmarks, sizeof(int), n, h);
      fwrite(costs, sizeof(double), n, h);
      fclose(h);
-     printf("Wrote the %i x %i data matrix successfully!\nIteration %i written successfully", n, d, iter);
+     printf("Iteration %i written successfully\n", n, d, iter);
  }
  
  // Function that runs the Barnes-Hut implementation of t-SNE

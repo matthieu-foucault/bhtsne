@@ -1,4 +1,5 @@
 const bhtsne = require('./build/Release/bhtsne')
+
 const runBHTSNE = () => {
     bhtsne.run()
 }
