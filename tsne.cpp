@@ -41,6 +41,7 @@
  #include <time.h>
  #include <string>
  #include <iostream>
+ #include <cstdio>
  #include "vptree.h"
  #include "sptree.h"
  #include "tsne.h"
@@ -49,7 +50,7 @@
  using namespace std;
  
  // Perform t-SNE
- void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
+ void TSNE::run(char* pathHash, double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
                 bool skip_random_init, int* landmarks, double* costs, int max_iter, int stop_lying_iter, int mom_switch_iter) {
  
      // Set random seed
@@ -185,8 +186,8 @@
              }
              start = clock();
          }
-         std::thread saveDataThread( [this, Y, landmarks, costs, N, no_dims, iter]() { 
-             save_data(Y, landmarks, costs, N, no_dims, iter); 
+         std::thread saveDataThread( [this, Y, landmarks, costs, N, no_dims, iter, pathHash]() { 
+             save_data(pathHash, Y, landmarks, costs, N, no_dims, iter); 
          });
  
          saveDataThread.detach();
@@ -672,7 +673,7 @@
  
  // Function that loads data from a t-SNE file
  // Note: this function does a malloc that should be freed elsewhere
- bool TSNE::load_data(double** data, int* n, int* d, int* no_dims, double* theta, double* perplexity, int* rand_seed, int* max_iter) {
+ bool TSNE::load_data(double** data, int* n, int* d, int* no_dims, double* theta, double* perplexity, int* rand_seed, int* max_iter, char** pathHash) {
  
      // Open file, read first 2 integers, allocate memory, and read the data
      FILE *h;
@@ -685,7 +686,12 @@
      fread(theta, sizeof(double), 1, h);										// gradient accuracy
      fread(perplexity, sizeof(double), 1, h);								// perplexity
      fread(no_dims, sizeof(int), 1, h);                                      // output dimensionality
-     fread(max_iter, sizeof(int),1,h);                                       // maximum number of iterations
+     fread(max_iter, sizeof(int), 1, h);                                       // maximum number of iterations
+ 
+     *pathHash = (char*) malloc(32 * sizeof(char));
+     if(*pathHash == NULL) { printf("Memory allocation failed!\n"); exit(1); }
+     fread(*pathHash, sizeof(char), 32, h);
+ 
      *data = (double*) malloc(*d * *n * sizeof(double));
      if(*data == NULL) { printf("Memory allocation failed!\n"); exit(1); }
      fread(*data, sizeof(double), *n * *d, h);                               // the data
@@ -696,10 +702,12 @@
  }
  
  // Function that saves map to a t-SNE file
- void TSNE::save_data(double* data, int* landmarks, double* costs, int n, int d, int iter) {
- 
+ void TSNE::save_data(char* pathHash, double* data, int* landmarks, double* costs, int n, int d, int iter) {
      // Open file, write first 2 integers and then the data
-     std::string pathString = "result" + std::to_string(iter) + ".dat";
+     string pHash(pathHash);
+     string iStr = to_string(iter);
+     string pathString = "/Users/jorinweatherston/Workspace/Lodestone/node_modules/bhtsne/" + pHash + "/result" + iStr + ".dat";
+ 
      FILE *h;
      if((h = fopen(pathString.c_str(), "w+b")) == NULL) {
          printf("Error: could not open data file.\n");
@@ -722,9 +730,10 @@
      double perplexity, theta, *data;
      int rand_seed = -1;
      TSNE* tsne = new TSNE();
+     char * pathHash;
  
      // Read the parameters and the dataset
-     if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter)) {
+     if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter, &pathHash)) {
  
          // Make dummy landmarks
          N = origN;
@@ -736,7 +745,7 @@
          double* Y = (double*) malloc(N * no_dims * sizeof(double));
          double* costs = (double*) calloc(N, sizeof(double));
          if(Y == NULL || costs == NULL) { printf("Memory allocation failed!\n"); exit(1); }
-         tsne->run(data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, landmarks, costs, max_iter);
+         tsne->run(pathHash, data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, landmarks, costs, max_iter);
  
          // Save the results
          // tsne->save_data(Y, landmarks, costs, N, no_dims, max_iter);
