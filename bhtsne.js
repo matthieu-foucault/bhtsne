@@ -46,8 +46,6 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 			dataDim = data[0].length
 			// the total amount of data
 			dataCount = data.length
-			// calculate the number of bytes in the string
-			console.log("string byte length", Buffer.byteLength(configHash))
 
 			// a binary stream of data that gets buffers written to it, the data.dat file
 			const ws = fs.createWriteStream(path.resolve(tmpDir, './data.dat'))
@@ -59,7 +57,8 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 			headerBuff.writeDoubleLE(opts.perplexity, 16)
 			headerBuff.writeInt32LE(opts.dims, 24)
 			headerBuff.writeInt32LE(opts.maxIterations, 28)
-			headerBuff.write(configHash, 32)
+			// add a null terminator to the configHash string for c-style arrays
+			headerBuff.write(configHash + '\0', 32, 33)
 			// write that data to the file
 			ws.write(headerBuff)
 
