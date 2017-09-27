@@ -706,7 +706,7 @@ bool TSNE::load_data(double** data, int* n, int* d, int* no_dims, double* theta,
 void TSNE::save_data(char* pathHash, double* data, int* landmarks, double* costs, int n, int d, int iter) {
     // Open file, write first 2 integers and then the data
     string pHash(pathHash);
-    string iStr = to_string(iter);
+    string iStr = to_string(iter + 1);
     string pathString = "/Users/jorinweatherston/Workspace/Lodestone/node_modules/bhtsne/" + pHash + "/result" + iStr + ".dat";
 
 	FILE *h;

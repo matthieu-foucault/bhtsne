@@ -107,7 +107,7 @@ module.exports.getTSNEIteration = (iteration, configHash, userOpts, data) => {
 		// path used to access result files
 		const resultsPathName = `${__dirname}/${configHash}`
 		// read the result.dat file for the results of the TSNE
-		fs.open(path.resolve(resultsPathName, `./result${iteration - 1}.dat`), 'r', (err, fd) => {
+		fs.open(path.resolve(resultsPathName, `./result${iteration}.dat`), 'r', (err, fd) => {
 			// check for errors
 			if (err) return reject(err)
 			// The first two integers are just the number of samples and the dimensionality, no need to read those
