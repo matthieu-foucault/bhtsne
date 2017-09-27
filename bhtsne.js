@@ -43,9 +43,9 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 			// setup options for the TSNE
 			const opts = Object.assign({}, defaultOpts, userOpts)
 			// the number of dimensions in the data 
-			dataDim = data[0].length
+			const dataDim = data[0].length
 			// the total amount of data
-			dataCount = data.length
+			const dataCount = data.length
 
 			// a binary stream of data that gets buffers written to it, the data.dat file
 			const ws = fs.createWriteStream(path.resolve(tmpDir, './data.dat'))
@@ -90,85 +90,58 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 				bp.on('message', msg => {
 					// print completion message
 					console.log(msg)
-					// read the result.dat file for the results of the TSNE
-					fs.open(path.resolve(resultsPathName, `./result${opts.maxIterations - 1}.dat`), 'r', (err, fd) => {
-						// check for errors
-						if (err) return reject(err)
-						// The first two integers are just the number of samples and the dimensionality, no need to read those
-						const offset = 4*2
-						// the length of the results
-						const resultLen = 8 * opts.dims * dataCount
-						// not sure what landmarks are but its 4 times the datacount long
-						const landmarksLen = 4 * dataCount
-						// The next part of the data is the unordered results and the landmarks
-						// read the data, allocate enough data for all of the data including landmarks, zero offset, total length, start after the first two nums, and callback
-						fs.read(fd, Buffer.alloc(resultLen + landmarksLen), 0, resultLen + landmarksLen, offset, (err, bytesRead, buffer) => {
-							// exit if errors
-							if (err) return reject(err)
-							// allocate unordered array
-							const unorderedResult = []
-							// go through all of the data
-							for(let i = 0; i < dataCount; i++) {
-								// allocate an array for the coordinates
-								const coords = []
-								// go through each of the dimensions
-								for (let c = 0; c < opts.dims; c++) {
-									// push the data for each dimension into the array for a row
-									coords.push(buffer.readDoubleLE(i * 8 * opts.dims + 8 * c))
-								}
-								// read the landmark in for i
-								let landmark = buffer.readInt32LE(resultLen + 4*i)
-								// push the landmark and coords pair into unorderedResult
-								unorderedResult.push([landmark, coords])
-							}
-							// sort the unordered pairs in place by 
-							const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
-					
-							resolve(result)
-						})
-					})
 				})
 			})
 		})
 	})
 }
 
-module.exports.getTSNEIteration = (iteration) => {
-	// read the result.dat file for the results of the TSNE
-	fs.open(path.resolve(tmpDir, `./result${opts.maxIterations - 1}.dat`), 'r', (err, fd) => {
-		// check for errors
-		if (err) return reject(err)
-		// The first two integers are just the number of samples and the dimensionality, no need to read those
-		const offset = 4*2
-		// the length of the results
-		const resultLen = 8 * opts.dims * dataCount
-		// not sure what landmarks are but its 4 times the datacount long
-		const landmarksLen = 4 * dataCount
-		// The next part of the data is the unordered results and the landmarks
-		// read the data, allocate enough data for all of the data including landmarks, zero offset, total length, start after the first two nums, and callback
-		fs.read(fd, Buffer.alloc(resultLen + landmarksLen), 0, resultLen + landmarksLen, offset, (err, bytesRead, buffer) => {
-			// exit if errors
+module.exports.getTSNEIteration = (iteration, configHash, userOpts, data) => {
+	return new Promise(function(resolve, reject) {
+		// the number of dimensions in the data 
+		const dataDim = data[0].length
+		// the total amount of data
+		const dataCount = data.length
+		// setup options for the TSNE
+		const opts = Object.assign({}, defaultOpts, userOpts)
+		// path used to access result files
+		const resultsPathName = `${__dirname}/${configHash}`
+		// read the result.dat file for the results of the TSNE
+		fs.open(path.resolve(resultsPathName, `./result${iteration - 1}.dat`), 'r', (err, fd) => {
+			// check for errors
 			if (err) return reject(err)
-			// allocate unordered array
-			const unorderedResult = []
-			// go through all of the data
-			for(let i = 0; i < dataCount; i++) {
-				// allocate an array for the coordinates
-				const coords = []
-				// go through each of the dimensions
-				for (let c = 0; c < opts.dims; c++) {
-					// push the data for each dimension into the array for a row
-					coords.push(buffer.readDoubleLE(i * 8 * opts.dims + 8 * c))
+			// The first two integers are just the number of samples and the dimensionality, no need to read those
+			const offset = 4*2
+			// the length of the results
+			const resultLen = 8 * opts.dims * dataCount
+			// not sure what landmarks are but its 4 times the datacount long
+			const landmarksLen = 4 * dataCount
+			// The next part of the data is the unordered results and the landmarks
+			// read the data, allocate enough data for all of the data including landmarks, zero offset, total length, start after the first two nums, and callback
+			fs.read(fd, Buffer.alloc(resultLen + landmarksLen), 0, resultLen + landmarksLen, offset, (err, bytesRead, buffer) => {
+				// exit if errors
+				if (err) return reject(err)
+				// allocate unordered array
+				const unorderedResult = []
+				// go through all of the data
+				for(let i = 0; i < dataCount; i++) {
+					// allocate an array for the coordinates
+					const coords = []
+					// go through each of the dimensions
+					for (let c = 0; c < opts.dims; c++) {
+						// push the data for each dimension into the array for a row
+						coords.push(buffer.readDoubleLE(i * 8 * opts.dims + 8 * c))
+					}
+					// read the landmark in for i
+					let landmark = buffer.readInt32LE(resultLen + 4*i)
+					// push the landmark and coords pair into unorderedResult
+					unorderedResult.push([landmark, coords])
 				}
-				// read the landmark in for i
-				let landmark = buffer.readInt32LE(resultLen + 4*i)
-				// push the landmark and coords pair into unorderedResult
-				unorderedResult.push([landmark, coords])
-			}
-			// sort the unordered pairs in place by 
-			const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
-	
-			resolve(result)
+				// sort the unordered pairs in place
+				const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
+		
+				resolve(result)
+			})
 		})
 	})
 }
