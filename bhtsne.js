@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const Buffer = require('buffer').Buffer
 const cp = require('child_process')
+const mkdirp = require('mkdirp')
 
 const defaultOpts = {
 	dims: 2,
@@ -15,26 +16,26 @@ const defaultOpts = {
 }
 
 // thank you: https://stackoverflow.com/questions/21194934/node-how-to-create-a-directory-if-doesnt-exist
-function ensureExists(path, mask, cb) {
+function ensureExists(resultPath, mask, cb) {
     if (typeof mask == 'function') { // allow the `mask` parameter to be optional
         cb = mask;
         mask = 0777;
     }
-    fs.mkdir(path, mask, function(err) {
+    mkdirp(resultPath, mask, function(err) {
         if (err) {
+			console.log('Error in ensureExists:', err)
             if (err.code == 'EEXIST') cb(null); // ignore the error if the folder already exists
             else cb(err); // something else went wrong
         } else cb(null); // successfully created folder
     });
 }
 
-module.exports.bhtsne = (data, userOpts, configHash) => {
+module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 	return new Promise(function(resolve, reject) {
 		tmp.dir((err, tmpDir) => {
 			if (err) return reject(err)
-			const resultsPathName = `${__dirname}/${configHash}`
 			// make data ouput directory
-			ensureExists(resultsPathName, 0744, function(err) {
+			ensureExists(resultPath, 0744, function(err) {
 				if (err) return reject(err) // handle folder creation error
 			})
 
@@ -46,21 +47,29 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 			const dataDim = data[0].length
 			// the total amount of data
 			const dataCount = data.length
-
+			// add the null terminating character to the result path
+			resultPath = resultPath + '\0'
+			// the total length of the path
+			const pathByteLength = Buffer.byteLength(resultPath, 'utf-8')
+			
 			// a binary stream of data that gets buffers written to it, the data.dat file
 			const ws = fs.createWriteStream(path.resolve(tmpDir, './data.dat'))
+			
 			// allocate a bunch of space for the following data chunks
-			const headerBuff = Buffer.alloc(64, 0)
+			const headerBuff = Buffer.alloc(36 + pathByteLength, 0)
 			headerBuff.writeInt32LE(dataCount, 0)
 			headerBuff.writeInt32LE(dataDim, 4)
 			headerBuff.writeDoubleLE(opts.theta, 8)
 			headerBuff.writeDoubleLE(opts.perplexity, 16)
 			headerBuff.writeInt32LE(opts.dims, 24)
 			headerBuff.writeInt32LE(opts.maxIterations, 28)
-			// add a null terminator to the configHash string for c-style arrays
-			headerBuff.write(configHash + '\0', 32, 33)
+			headerBuff.writeInt32LE(pathByteLength, 32)
+			headerBuff.write(resultPath, 36, pathByteLength)
+			
 			// write that data to the file
-			ws.write(headerBuff)
+			if(!ws.write(headerBuff)){
+				reject("Writing parameters to data.dat failed")
+			}
 
 			// allocate memory again
 			const dataBuff = Buffer.alloc(8*dataDim*dataCount, 0)
@@ -70,19 +79,30 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 					dataBuff.writeDoubleLE(data[n][d], 8*n*dataDim + 8*d)
 				}
 			}
+			// write the data buffer to the file
+			if(!ws.write(dataBuff)){
+				ws.once('drain', () => {
+					if(!ws.write(dataBuff))
+					reject("Writing data to data.dat failed")
+				})
+			}
 
-			// write the buffer to the file
-			ws.write(dataBuff)
 			if (opts.randseed !== defaultOpts.randseed) {
 				const randseedBuff = Buffer.alloc(4, 0)
 				randseedBuff.writeInt32LE(opts.randseed, 0)
-				ws.write(randseedBuff)
+				if(!ws.write(randseedBuff)){
+					ws.once('drain', () => {
+						if(!ws.write(randseedBuff))
+						reject("writing randseed to data.dat failed")
+					})
+				}
 			}
 			// kill the stream
 			ws.end()
 			// when it is done writing (finish)
 			ws.on('finish', () => {
 				// break TSNE off into a child process
+				console.log('Launching bhtsne fork')
 				const bp = cp.fork(`${__dirname}/runbhtsne.js`)
 				// trigger the TSNE run
 				bp.send('start')
@@ -96,7 +116,7 @@ module.exports.bhtsne = (data, userOpts, configHash) => {
 	})
 }
 
-module.exports.getTSNEIteration = (iteration, configHash, userOpts, data) => {
+module.exports.getTSNEIteration = (iteration, configHash, userOpts, data, resultPath) => {
 	return new Promise(function(resolve, reject) {
 		// the number of dimensions in the data 
 		const dataDim = data[0].length
@@ -104,10 +124,9 @@ module.exports.getTSNEIteration = (iteration, configHash, userOpts, data) => {
 		const dataCount = data.length
 		// setup options for the TSNE
 		const opts = Object.assign({}, defaultOpts, userOpts)
-		// path used to access result files
-		const resultsPathName = `${__dirname}/${configHash}`
 		// read the result.dat file for the results of the TSNE
-		fs.open(path.resolve(resultsPathName, `./result${iteration}.dat`), 'r', (err, fd) => {
+		console.log('trying to open this iteration: ', iteration)
+		fs.open(path.resolve(resultPath, `./result${iteration}.dat`), 'r', (err, fd) => {
 			// check for errors
 			if (err) return reject(err)
 			// The first two integers are just the number of samples and the dimensionality, no need to read those
