@@ -1,25 +1,25 @@
 #include <node.h>
 #include "tsne.h"
 #include <stdlib.h>
+#include <cstdio>
 
 using v8::FunctionCallbackInfo;
 using v8::Isolate;
 using v8::Local;
 using v8::Object;
-using v8::String;
 using v8::Value;
 
 void Method(const FunctionCallbackInfo<Value>& args) {
 	// Define some variables
-	int origN, N, D, no_dims, max_iter, *landmarks;
-	double perc_landmarks;
+	int origN, N, D, no_dims, max_iter;
 	double perplexity, theta, *data;
-    int rand_seed = -1;
-    TSNE* tsne = new TSNE();
-
+	int rand_seed = -1;
+	char *resultsPath;
+	TSNE* tsne = new TSNE();
+	
     // Read the parameters and the dataset
-	if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter)) {
-
+	if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter, &resultsPath)) {
+		printf("made it past loadData\n");
 		// Make dummy landmarks
         N = origN;
         int* landmarks = (int*) malloc(N * sizeof(int));
@@ -30,10 +30,10 @@ void Method(const FunctionCallbackInfo<Value>& args) {
 		double* Y = (double*) malloc(N * no_dims * sizeof(double));
 		double* costs = (double*) calloc(N, sizeof(double));
         if(Y == NULL || costs == NULL) { printf("Memory allocation failed!\n"); exit(1); }
-		tsne->run(data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, max_iter);
+		tsne->run(resultsPath, data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, landmarks, costs, max_iter);
 
 		// Save the results
-		tsne->save_data(Y, landmarks, costs, N, no_dims);
+		// tsne->save_data(Y, landmarks, costs, N, no_dims, max_iter);
 
         // Clean up the memory
 		free(data); data = NULL;

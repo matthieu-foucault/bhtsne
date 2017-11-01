@@ -37,7 +37,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring>
+#include <thread>
 #include <time.h>
+#include <string>
+#include <iostream>
+#include <cstdio>
 #include "vptree.h"
 #include "sptree.h"
 #include "tsne.h"
@@ -46,9 +50,9 @@
 using namespace std;
 
 // Perform t-SNE
-void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
-               bool skip_random_init, int max_iter, int stop_lying_iter, int mom_switch_iter) {
-
+void TSNE::run(char* resultsPath, double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
+               bool skip_random_init, int* landmarks, double* costs, int max_iter, int stop_lying_iter, int mom_switch_iter) {
+    
     // Set random seed
     if (skip_random_init != true) {
       if(rand_seed >= 0) {
@@ -125,14 +129,14 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
         // Symmetrize input similarities
         symmetrizeMatrix(&row_P, &col_P, &val_P, N);
         double sum_P = .0;
-        for(int i = 0; i < row_P[N]; i++) sum_P += val_P[i];
-        for(int i = 0; i < row_P[N]; i++) val_P[i] /= sum_P;
+        for(unsigned int i = 0; i < row_P[N]; i++) sum_P += val_P[i];
+        for(unsigned int i = 0; i < row_P[N]; i++) val_P[i] /= sum_P;
     }
     end = clock();
 
     // Lie about the P-values
     if(exact) { for(int i = 0; i < N * N; i++)        P[i] *= 12.0; }
-    else {      for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0; }
+    else {      for(unsigned int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0; }
 
 	// Initialize solution (randomly)
   if (skip_random_init != true) {
@@ -164,7 +168,7 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
         // Stop lying about the P-values after a while, and switch momentum
         if(iter == stop_lying_iter) {
             if(exact) { for(int i = 0; i < N * N; i++)        P[i] /= 12.0; }
-            else      { for(int i = 0; i < row_P[N]; i++) val_P[i] /= 12.0; }
+            else      { for(unsigned int i = 0; i < row_P[N]; i++) val_P[i] /= 12.0; }
         }
         if(iter == mom_switch_iter) momentum = final_momentum;
 
@@ -182,6 +186,11 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
             }
 			start = clock();
         }
+        std::thread saveDataThread( [this, Y, landmarks, costs, N, no_dims, iter, resultsPath]() { 
+            save_data(resultsPath, Y, landmarks, costs, N, no_dims, iter); 
+        });
+
+        saveDataThread.detach();
     }
     end = clock(); total_time += (float) (end - start) / CLOCKS_PER_SEC;
 
@@ -324,7 +333,7 @@ double TSNE::evaluateError(unsigned int* row_P, unsigned int* col_P, double* val
     double C = .0, Q;
     for(int n = 0; n < N; n++) {
         ind1 = n * D;
-        for(int i = row_P[n]; i < row_P[n + 1]; i++) {
+        for(unsigned int i = row_P[n]; i < row_P[n + 1]; i++) {
             Q = .0;
             ind2 = col_P[i] * D;
             for(int d = 0; d < D; d++) buff[d]  = Y[ind1 + d];
@@ -498,8 +507,8 @@ void TSNE::computeGaussianPerplexity(double* X, int N, int D, unsigned int** _ro
         }
 
         // Row-normalize current row of P and store in matrix
-        for(unsigned int m = 0; m < K; m++) cur_P[m] /= sum_P;
-        for(unsigned int m = 0; m < K; m++) {
+        for(int m = 0; m < K; m++) cur_P[m] /= sum_P;
+        for(int m = 0; m < K; m++) {
             col_P[row_P[n] + m] = (unsigned int) indices[m + 1].index();
             val_P[row_P[n] + m] = cur_P[m];
         }
@@ -524,11 +533,11 @@ void TSNE::symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, double
     int* row_counts = (int*) calloc(N, sizeof(int));
     if(row_counts == NULL) { printf("Memory allocation failed!\n"); exit(1); }
     for(int n = 0; n < N; n++) {
-        for(int i = row_P[n]; i < row_P[n + 1]; i++) {
+        for(unsigned int i = row_P[n]; i < row_P[n + 1]; i++) {
 
             // Check whether element (col_P[i], n) is present
             bool present = false;
-            for(int m = row_P[col_P[i]]; m < row_P[col_P[i] + 1]; m++) {
+            for(unsigned int m = row_P[col_P[i]]; m < row_P[col_P[i] + 1]; m++) {
                 if(col_P[m] == n) present = true;
             }
             if(present) row_counts[n]++;
@@ -664,36 +673,50 @@ double TSNE::randn() {
 
 // Function that loads data from a t-SNE file
 // Note: this function does a malloc that should be freed elsewhere
-bool TSNE::load_data(double** data, int* n, int* d, int* no_dims, double* theta, double* perplexity, int* rand_seed, int* max_iter) {
+bool TSNE::load_data(double** data, int* n, int* d, int* no_dims, double* theta, double* perplexity, int* rand_seed, int* max_iter, char** resultsPath) {
 
 	// Open file, read first 2 integers, allocate memory, and read the data
     FILE *h;
-	if((h = fopen("data.dat", "r+b")) == NULL) {
-		printf("Error: could not open data file.\n");
+	if((h = fopen("data.dat", "r+b, ccs=UTF-8")) == NULL) {
+		printf("Error: could not open params file.\n");
 		return false;
-	}
+    }
+    int pathByteLength = 0;
 	fread(n, sizeof(int), 1, h);											// number of datapoints
 	fread(d, sizeof(int), 1, h);											// original dimensionality
     fread(theta, sizeof(double), 1, h);										// gradient accuracy
 	fread(perplexity, sizeof(double), 1, h);								// perplexity
 	fread(no_dims, sizeof(int), 1, h);                                      // output dimensionality
-    fread(max_iter, sizeof(int),1,h);                                       // maximum number of iterations
-	*data = (double*) malloc(*d * *n * sizeof(double));
-    if(*data == NULL) { printf("Memory allocation failed!\n"); exit(1); }
-    fread(*data, sizeof(double), *n * *d, h);                               // the data
+    fread(max_iter, sizeof(int), 1, h);                                     // maximum number of iterations
+    fread(&pathByteLength, sizeof(int), 1, h);                              // total length of the dynamic path
+
+    *resultsPath = (char*) malloc(pathByteLength * sizeof(char));
+    if(*resultsPath == NULL) {printf("Memory allocation failed!\n"); return false; }
+    if(fread(*resultsPath, sizeof(char), pathByteLength, h) != (size_t) pathByteLength) {
+        printf("Reading in the result path was not successful");
+        return false;
+    }
+
+    *data = (double*) malloc(*d * *n * sizeof(double));
+    if(*data == NULL) { printf("Memory allocation failed!\n"); return false; }
+    fread(*data, sizeof(double), *n * *d, h);
+
     if(!feof(h)) fread(rand_seed, sizeof(int), 1, h);                       // random seed
-	fclose(h);
+    fclose(h);
 	printf("Read the %i x %i data matrix successfully!\n", *n, *d);
 	return true;
 }
 
 // Function that saves map to a t-SNE file
-void TSNE::save_data(double* data, int* landmarks, double* costs, int n, int d) {
+void TSNE::save_data(char* resultsPath, double* data, int* landmarks, double* costs, int n, int d, int iter) {
+    // Open file, write first 2 integers and then the data
+    string pHash(resultsPath);
+    string iStr = to_string(iter + 1);
+    string pathString = pHash + "/result" + iStr + ".dat";
 
-	// Open file, write first 2 integers and then the data
 	FILE *h;
-	if((h = fopen("result.dat", "w+b")) == NULL) {
-		printf("Error: could not open data file.\n");
+	if((h = fopen(pathString.c_str(), "w+b")) == NULL) {
+		printf("Error: could not open data file: %s\n", pathString.c_str());
 		return;
 	}
 	fwrite(&n, sizeof(int), 1, h);
@@ -702,22 +725,21 @@ void TSNE::save_data(double* data, int* landmarks, double* costs, int n, int d) 
 	fwrite(landmarks, sizeof(int), n, h);
     fwrite(costs, sizeof(double), n, h);
     fclose(h);
-	printf("Wrote the %i x %i data matrix successfully!\n", n, d);
+	printf("Iteration %i written successfully\n", iter);
 }
-
 
 // Function that runs the Barnes-Hut implementation of t-SNE
 int main() {
 
     // Define some variables
-	int origN, N, D, no_dims, max_iter, *landmarks;
-	double perc_landmarks;
+	int origN, N, D, no_dims, max_iter;
 	double perplexity, theta, *data;
     int rand_seed = -1;
     TSNE* tsne = new TSNE();
+    char * resultsPath;
 
     // Read the parameters and the dataset
-	if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter)) {
+	if(tsne->load_data(&data, &origN, &D, &no_dims, &theta, &perplexity, &rand_seed, &max_iter, &resultsPath)) {
 
 		// Make dummy landmarks
         N = origN;
@@ -729,10 +751,7 @@ int main() {
 		double* Y = (double*) malloc(N * no_dims * sizeof(double));
 		double* costs = (double*) calloc(N, sizeof(double));
         if(Y == NULL || costs == NULL) { printf("Memory allocation failed!\n"); exit(1); }
-		tsne->run(data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, max_iter);
-
-		// Save the results
-		tsne->save_data(Y, landmarks, costs, N, no_dims);
+		tsne->run(resultsPath, data, N, D, Y, no_dims, perplexity, theta, rand_seed, false, landmarks, costs, max_iter);
 
         // Clean up the memory
 		free(data); data = NULL;
