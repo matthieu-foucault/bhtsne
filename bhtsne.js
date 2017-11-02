@@ -43,7 +43,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			process.chdir(tmpDir)
 			// setup options for the TSNE
 			const opts = Object.assign({}, defaultOpts, userOpts)
-			// the number of dimensions in the data 
+			// the number of dimensions in the data
 			const dataDim = data[0].length
 			// the total amount of data
 			const dataCount = data.length
@@ -51,10 +51,10 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			resultPath = resultPath + '\0'
 			// the total length of the path
 			const pathByteLength = Buffer.byteLength(resultPath, 'utf-8')
-			
+
 			// a binary stream of data that gets buffers written to it, the data.dat file
 			const ws = fs.createWriteStream(path.resolve(tmpDir, './data.dat'))
-			
+
 			// allocate a bunch of space for the following data chunks
 			const headerBuff = Buffer.alloc(36 + pathByteLength, 0)
 			headerBuff.writeInt32LE(dataCount, 0)
@@ -65,7 +65,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			headerBuff.writeInt32LE(opts.maxIterations, 28)
 			headerBuff.writeInt32LE(pathByteLength, 32)
 			headerBuff.write(resultPath, 36, pathByteLength)
-			
+
 			// write that data to the file
 			if(!ws.write(headerBuff)){
 				reject("Writing parameters to data.dat failed")
@@ -118,14 +118,13 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 
 module.exports.getTSNEIteration = (iteration, configHash, userOpts, data, resultPath) => {
 	return new Promise(function(resolve, reject) {
-		// the number of dimensions in the data 
+		// the number of dimensions in the data
 		const dataDim = data[0].length
 		// the total amount of data
 		const dataCount = data.length
 		// setup options for the TSNE
 		const opts = Object.assign({}, defaultOpts, userOpts)
 		// read the result.dat file for the results of the TSNE
-		console.log('trying to open this iteration: ', iteration)
 		fs.open(path.resolve(resultPath, `./result${iteration}.dat`), 'r', (err, fd) => {
 			// check for errors
 			if (err) return reject(err)
@@ -158,7 +157,7 @@ module.exports.getTSNEIteration = (iteration, configHash, userOpts, data, result
 				}
 				// sort the unordered pairs in place
 				const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
-		
+
 				resolve(result)
 			})
 		})
