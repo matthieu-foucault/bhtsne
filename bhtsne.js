@@ -157,7 +157,7 @@ module.exports.getTSNEIteration = (iteration, configHash, userOpts, data, result
 				}
 				// sort the unordered pairs in place
 				const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
-
+				fs.close(fd)
 				resolve(result)
 			})
 		})
