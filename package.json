@@ -4,6 +4,7 @@
   "description": "NodeJS wrapper for bhtsne",
   "main": "bhtsne.js",
   "dependencies": {
+    "mkdirp": "0.5.1",
     "tmp": "0.0.31"
   },
   "devDependencies": {},
