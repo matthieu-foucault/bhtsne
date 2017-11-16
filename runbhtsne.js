@@ -5,6 +5,10 @@ const runBHTSNE = () => {
 }
 
 process.on('message', (msg) => {
-    runBHTSNE()
-    process.send('tsne complete')
+    try {
+        runBHTSNE()
+        process.send('tsne complete')
+    } catch (e) {
+        process.send(e)
+    }
 })

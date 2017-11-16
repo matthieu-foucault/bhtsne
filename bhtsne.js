@@ -17,17 +17,17 @@ const defaultOpts = {
 
 // thank you: https://stackoverflow.com/questions/21194934/node-how-to-create-a-directory-if-doesnt-exist
 function ensureExists(resultPath, mask, cb) {
-    if (typeof mask == 'function') { // allow the `mask` parameter to be optional
-        cb = mask;
-        mask = 0777;
-    }
-    mkdirp(resultPath, mask, function(err) {
-        if (err) {
+	if (typeof mask == 'function') { // allow the `mask` parameter to be optional
+		cb = mask
+		mask = 777
+	}
+	mkdirp(resultPath, mask, function(err) {
+		if (err) {
 			console.log('Error in ensureExists:', err)
-            if (err.code == 'EEXIST') cb(null); // ignore the error if the folder already exists
-            else cb(err); // something else went wrong
-        } else cb(null); // successfully created folder
-    });
+			if (err.code === 'EEXIST') cb(null) // ignore the error if the folder already exists
+			else cb(err) // something else went wrong
+		} else cb(null) // successfully created folder
+	})
 }
 
 module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
@@ -35,7 +35,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 		tmp.dir((err, tmpDir) => {
 			if (err) return reject(err)
 			// make data ouput directory
-			ensureExists(resultPath, 0744, function(err) {
+			ensureExists(resultPath, 744, function(err) {
 				if (err) return reject(err) // handle folder creation error
 			})
 
@@ -48,7 +48,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			// the total amount of data
 			const dataCount = data.length
 			// add the null terminating character to the result path
-			resultPath = resultPath + '\0'
+			resultPath += '\0'
 			// the total length of the path
 			const pathByteLength = Buffer.byteLength(resultPath, 'utf-8')
 
@@ -67,8 +67,8 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			headerBuff.write(resultPath, 36, pathByteLength)
 
 			// write that data to the file
-			if(!ws.write(headerBuff)){
-				reject("Writing parameters to data.dat failed")
+			if (!ws.write(headerBuff)){
+				reject('Writing parameters to data.dat failed')
 			}
 
 			// allocate memory again
@@ -80,20 +80,20 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 				}
 			}
 			// write the data buffer to the file
-			if(!ws.write(dataBuff)){
+			if (!ws.write(dataBuff)){
 				ws.once('drain', () => {
-					if(!ws.write(dataBuff))
-					reject("Writing data to data.dat failed")
+					if (!ws.write(dataBuff))
+						reject('Writing data to data.dat failed')
 				})
 			}
 
 			if (opts.randseed !== defaultOpts.randseed) {
 				const randseedBuff = Buffer.alloc(4, 0)
 				randseedBuff.writeInt32LE(opts.randseed, 0)
-				if(!ws.write(randseedBuff)){
+				if (!ws.write(randseedBuff)){
 					ws.once('drain', () => {
-						if(!ws.write(randseedBuff))
-						reject("writing randseed to data.dat failed")
+						if (!ws.write(randseedBuff))
+							reject('writing randseed to data.dat failed')
 					})
 				}
 			}
@@ -109,7 +109,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 				// trigger the TSNE run
 				bp.send('start')
 				// recieve feedback on the TSNE run
-				bp.on('message', msg => {
+				bp.on('message', (msg) => {
 					// print completion message
 					console.log(msg)
 				})
@@ -118,50 +118,59 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 	})
 }
 
-module.exports.getTSNEIteration = (iteration, configHash, userOpts, data, resultPath) => {
+/**
+ * @function bhtsne.getTSNEIteration
+ * Loads the data for a specific iteration of the tSNE algorithm.
+ * The returned promise will resolve with a 2d array.
+ * Each element in this array is a data point, and each value is one of the dimensions.
+ * @param {number} iteration - The iterations that
+ * @param {string} resultPath - The absolute path to the directory containing the results files
+ * @param {number} dataLength - The amount of data points contained in the result
+ * @param {number} [dims=2] - The number of dimensions each data point contains. (defaults to 2)
+ * @returns {Promise<number[][]>}
+ */
+module.exports.getTSNEIteration = (iteration, resultPath, dataLength, dims = 2) => {
 	return new Promise(function(resolve, reject) {
-		// the number of dimensions in the data
-		const dataDim = data[0].length
-		// the total amount of data
-		const dataCount = data.length
-		// setup options for the TSNE
-		const opts = Object.assign({}, defaultOpts, userOpts)
-		// read the result.dat file for the results of the TSNE
-		fs.open(path.resolve(resultPath, `./result${iteration}.dat`), 'r', (err, fd) => {
-			// check for errors
-			if (err) return reject(err)
-			// The first two integers are just the number of samples and the dimensionality, no need to read those
-			const offset = 4*2
-			// the length of the results
-			const resultLen = 8 * opts.dims * dataCount
-			// not sure what landmarks are but its 4 times the datacount long
-			const landmarksLen = 4 * dataCount
-			// The next part of the data is the unordered results and the landmarks
-			// read the data, allocate enough data for all of the data including landmarks, zero offset, total length, start after the first two nums, and callback
-			fs.read(fd, Buffer.alloc(resultLen + landmarksLen), 0, resultLen + landmarksLen, offset, (err, bytesRead, buffer) => {
-				// exit if errors
+		try {
+			// read the result.dat file for the results of the TSNE
+			fs.open(path.resolve(resultPath, `./result${iteration}.dat`), 'r', (err, fd) => {
+				// check for errors
 				if (err) return reject(err)
-				// allocate unordered array
-				const unorderedResult = []
-				// go through all of the data
-				for(let i = 0; i < dataCount; i++) {
-					// allocate an array for the coordinates
-					const coords = []
-					// go through each of the dimensions
-					for (let c = 0; c < opts.dims; c++) {
-						// push the data for each dimension into the array for a row
-						coords.push(buffer.readDoubleLE(i * 8 * opts.dims + 8 * c))
+				// The first two integers are just the number of samples and the dimensionality, no need to read those
+				const offset = 4*2
+				// the length of the results
+				const resultLen = 8 * dims * dataLength
+				// not sure what landmarks are but its 4 times the dataLength long
+				const landmarksLen = 4 * dataLength
+				// The next part of the data is the unordered results and the landmarks
+				// read the data, allocate enough data for all of the data including landmarks, zero offset, total length, start after the first two nums, and callback
+				fs.read(fd, Buffer.alloc(resultLen + landmarksLen), 0, resultLen + landmarksLen, offset, (err, bytesRead, buffer) => {
+					// exit if errors
+					if (err) return reject(err)
+					// allocate unordered array
+					const unorderedResult = []
+					// go through all of the data
+					for (let i = 0; i < dataLength; i++) {
+						// allocate an array for the coordinates
+						const coords = []
+						// go through each of the dimensions
+						for (let c = 0; c < dims; c++) {
+							// push the data for each dimension into the array for a row
+							coords.push(buffer.readDoubleLE(i * 8 * dims + 8 * c))
+						}
+						// read the landmark in for i
+						const landmark = buffer.readInt32LE(resultLen + 4*i)
+						// push the landmark and coords pair into unorderedResult
+						unorderedResult.push([landmark, coords])
 					}
-					// read the landmark in for i
-					let landmark = buffer.readInt32LE(resultLen + 4*i)
-					// push the landmark and coords pair into unorderedResult
-					unorderedResult.push([landmark, coords])
-				}
-				// sort the unordered pairs in place
-				const result = unorderedResult.sort((a,b) => (a[0] - b[0])).map((e) => e[1])
-				fs.close(fd)
-				resolve(result)
+					// sort the unordered pairs in place
+					const result = unorderedResult.sort((a, b) => (a[0] - b[0])).map((e) => e[1])
+					fs.close(fd)
+					resolve(result)
+				})
 			})
-		})
+		} catch (e) {
+			reject(e)
+		}
 	})
 }
