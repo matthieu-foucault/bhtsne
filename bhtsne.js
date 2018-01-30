@@ -103,9 +103,7 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			ws.on('finish', () => {
 				// break TSNE off into a child process
 				console.log('Launching bhtsne fork')
-				const argv = Array.from(process.execArgv)
-				argv.push('--inspect-port=0')
-				const bp = cp.fork(`${__dirname}/runbhtsne.js`, {execArgv: argv})
+				const bp = cp.fork(`${__dirname}/runbhtsne.js`)
 				// trigger the TSNE run
 				bp.send('start')
 				// recieve feedback on the TSNE run

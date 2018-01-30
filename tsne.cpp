@@ -52,7 +52,7 @@ using namespace std;
 // Perform t-SNE
 void TSNE::run(char* resultsPath, double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
                bool skip_random_init, int* landmarks, double* costs, int max_iter, int stop_lying_iter, int mom_switch_iter) {
-    
+
     // Set random seed
     if (skip_random_init != true) {
       if(rand_seed >= 0) {
@@ -186,8 +186,8 @@ void TSNE::run(char* resultsPath, double* X, int N, int D, double* Y, int no_dim
             }
 			start = clock();
         }
-        std::thread saveDataThread( [this, Y, landmarks, costs, N, no_dims, iter, resultsPath]() { 
-            save_data(resultsPath, Y, landmarks, costs, N, no_dims, iter); 
+        std::thread saveDataThread( [this, Y, landmarks, costs, N, no_dims, iter, resultsPath]() {
+            save_data(resultsPath, Y, landmarks, costs, N, no_dims, iter);
         });
 
         saveDataThread.detach();
@@ -725,7 +725,6 @@ void TSNE::save_data(char* resultsPath, double* data, int* landmarks, double* co
 	fwrite(landmarks, sizeof(int), n, h);
     fwrite(costs, sizeof(double), n, h);
     fclose(h);
-	printf("Iteration %i written successfully\n", iter);
 }
 
 // Function that runs the Barnes-Hut implementation of t-SNE
