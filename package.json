@@ -1,6 +1,6 @@
 {
   "name": "bhtsne",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "NodeJS wrapper for bhtsne",
   "main": "bhtsne.js",
   "dependencies": {
