@@ -4,6 +4,7 @@ const fs = require('fs')
 const Buffer = require('buffer').Buffer
 const cp = require('child_process')
 const mkdirp = require('mkdirp')
+const findPort = require('find-port')
 
 const defaultOpts = {
 	dims: 2,
@@ -103,13 +104,19 @@ module.exports.bhtsne = (data, userOpts, configHash, resultPath) => {
 			ws.on('finish', () => {
 				// break TSNE off into a child process
 				console.log('Launching bhtsne fork')
-				const bp = cp.fork(`${__dirname}/runbhtsne.js`)
-				// trigger the TSNE run
-				bp.send('start')
-				// recieve feedback on the TSNE run
-				bp.on('message', (msg) => {
-					// print completion message
-					console.log(msg)
+				const argv = Array.from(process.execArgv)
+				findPort('127.0.0.1', 9230, 9240, (ports) => {
+					if (argv.includes('--inspect'))
+						argv.push(`--inspect-port=${ports[0]}`)
+
+					const bp = cp.fork(`${__dirname}/runbhtsne.js`, {execArgv: argv})
+					// trigger the TSNE run
+					bp.send('start')
+					// recieve feedback on the TSNE run
+					bp.on('message', (msg) => {
+						// print completion message
+						console.log(msg)
+					})
 				})
 			})
 		})
